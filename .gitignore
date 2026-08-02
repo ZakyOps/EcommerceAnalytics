@@ -1,0 +1,26 @@
+# --- SBT / Scala build artifacts (régénérés par sbt compile/run/assembly) ---
+target/
+project/target/
+project/project/target/
+
+# --- Résultats générés à l'exécution du pipeline (régénérés par sbt run) ---
+output/
+
+# --- Metadata d'outils Scala (Metals, Bloop, BSP) ---
+.bloop/
+.metals/
+.bsp/
+.ammonite/
+metals.sbt
+
+# --- IDE ---
+.vscode/
+.idea/
+.idea_modules/
+*.iml
+
+# --- OS ---
+.DS_Store
+
+# --- Logs ---
+*.log
