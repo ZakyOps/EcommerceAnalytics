@@ -5,15 +5,11 @@ import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 
-/**
- * Centralise la lecture des 4 sources de données du projet (Partie 2.1),
- * leur validation (Partie 2.2) et la gestion des erreurs de chargement (Partie 2.3).
- */
 class DataIngestion(sparkSession: SparkSession) {
 
   import sparkSession.implicits._
 
-  /** transactions.csv : schéma défini explicitement (Partie 2.1). */
+  // schéma défini explicitement pour transactions.csv
   private val transactionSchema = StructType(Seq(
     StructField("transaction_id", StringType, nullable = false),
     StructField("user_id", StringType, nullable = false),
@@ -25,10 +21,6 @@ class DataIngestion(sparkSession: SparkSession) {
     StructField("payment_method", StringType, nullable = true),
     StructField("category", StringType, nullable = true)
   ))
-
-  // ---------------------------------------------------------------------
-  // Partie 2.2 - Validation : une fonction de règles par dataset
-  // ---------------------------------------------------------------------
 
   def validateTransactions(ds: Dataset[Transaction]): Dataset[Transaction] =
     ds.filter(t => t.amount > 0 && t.timestamp != null && t.timestamp.length == 14)
@@ -42,10 +34,6 @@ class DataIngestion(sparkSession: SparkSession) {
   def validateMerchants(ds: Dataset[Merchant]): Dataset[Merchant] =
     ds.filter(m => m.commission_rate >= 0 && m.commission_rate <= 1)
 
-  // ---------------------------------------------------------------------
-  // Partie 2.1 + 2.3 - Lecture, try/catch, bilan lignes lues / lignes valides
-  // ---------------------------------------------------------------------
-
   def loadTransactions(path: String): Dataset[Transaction] =
     loadAndValidate("transactions.csv", sparkSession.emptyDataset[Transaction]) {
       val raw = sparkSession.read
@@ -58,11 +46,8 @@ class DataIngestion(sparkSession: SparkSession) {
 
   def loadUsers(path: String): Dataset[User] =
     loadAndValidate("users.json", sparkSession.emptyDataset[User]) {
-      // users.json contient un champ imbriqué (preferred_categories: Array[String]) ;
-      // spark.read.json infère nativement les tableaux/structures JSON. Les entiers
-      // JSON sans décimale sont inférés en BIGINT (Long) : on re-caste "age" en Int
-      // pour correspondre au type de la case class User (Long -> Int est un narrowing
-      // cast que Spark refuse implicitement lors du .as[User]).
+      // age est inféré en Long (BIGINT) par spark.read.json, on le recaste en Int
+      // pour matcher la case class User
       val raw = sparkSession.read
         .option("multiline", "false")
         .json(path)
@@ -79,9 +64,8 @@ class DataIngestion(sparkSession: SparkSession) {
 
   def loadMerchants(path: String): Dataset[Merchant] =
     loadAndValidate("merchants.csv", sparkSession.emptyDataset[Merchant]) {
-      // Schéma laissé à l'inférence de Spark (Partie 2.1). establishment_date
-      // ressemble à un nombre (ex: 20220918) : Spark l'infère en Int, on la
-      // re-caste donc en String pour respecter le type documenté du dataset.
+      // inferSchema laisse Spark deviner les types, mais establishment_date
+      // (ex: 20220918) est alors inféré en Int -> on la recaste en String
       val raw = sparkSession.read
         .option("header", "true")
         .option("inferSchema", "true")
@@ -91,11 +75,7 @@ class DataIngestion(sparkSession: SparkSession) {
       (raw, validateMerchants(raw))
     }
 
-  /**
-   * Factorise le bloc try/catch commun aux 4 lectures : capture les erreurs de
-   * lecture (fichier introuvable, structure incorrecte, etc.), puis affiche le
-   * nombre de lignes lues avant validation et le nombre de lignes valides après.
-   */
+  // factorise le try/catch commun aux 4 lectures + le bilan lignes lues/valides
   private def loadAndValidate[T](
       label: String,
       onError: => Dataset[T]

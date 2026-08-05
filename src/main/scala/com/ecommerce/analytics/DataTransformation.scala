@@ -10,13 +10,8 @@ import java.time.{DayOfWeek, LocalDateTime}
 import java.time.format.{DateTimeFormatter, TextStyle}
 import java.util.Locale
 
-/**
- * Partie 3.1 - logique de l'UDF extractTimeFeatures, isolée dans un objet
- * top-level (sans référence à SparkSession) pour que la closure envoyée aux
- * executors soit sérialisable : si la fonction avait été une méthode de la
- * classe DataTransformation, l'eta-expansion aurait capturé `this`, donc le
- * champ `sparkSession` (non sérialisable) -> "Task not serializable".
- */
+// logique de l'UDF isolée ici (objet top-level, pas de référence à SparkSession)
+// sinon l'eta-expansion capture `this` -> Task not serializable
 object TimeFeaturesUdf {
 
   private val timestampFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
@@ -37,25 +32,13 @@ object TimeFeaturesUdf {
     TimeFeatures(hour, dayOfWeek, month, isWeekend, dayPeriod, isWorkingHours)
   }
 
-  /** UDF publique réutilisable ; renvoie un struct correspondant à TimeFeatures. */
   val extractTimeFeatures: UserDefinedFunction = udf(extractTimeFeaturesLogic _)
 }
 
-/** Transformations avancées : UDF temporelle, jointures enrichies, fonctions de fenêtrage (Partie 3). */
 class DataTransformation(sparkSession: SparkSession) {
 
-  /** UDF publique réutilisable (Partie 3.1), déléguée à l'objet top-level TimeFeaturesUdf. */
   val extractTimeFeatures: UserDefinedFunction = TimeFeaturesUdf.extractTimeFeatures
 
-  // ---------------------------------------------------------------------
-  // Partie 3.2 - enrichTransactionData
-  // ---------------------------------------------------------------------
-
-  /**
-   * Joint transactions/utilisateurs/produits/marchands, applique l'UDF temporelle
-   * et ajoute les colonnes de fenêtrage (rang par utilisateur, nombre total de
-   * transactions par utilisateur) ainsi que la tranche d'âge du client.
-   */
   def enrichTransactionData(
       transactions: Dataset[Transaction],
       users: Dataset[User],
@@ -63,8 +46,7 @@ class DataTransformation(sparkSession: SparkSession) {
       merchants: Dataset[Merchant]
   ): DataFrame = {
 
-    // On renomme les colonnes en collision (category, name, merchant_id) avant
-    // la jointure pour garder un DataFrame final sans ambiguïté de colonnes.
+    // category/name/merchant_id existent dans plusieurs tables -> on renomme avant de joindre
     val txn = transactions.toDF().withColumnRenamed("category", "txn_category")
 
     val prod = products.toDF()
@@ -87,8 +69,8 @@ class DataTransformation(sparkSession: SparkSession) {
         col("establishment_date")
       )
 
-    // Partie 5.2 - broadcast() de la petite table merchants pour éviter le shuffle
-    // de la table de transactions (volumineuse) lors de la jointure.
+    // broadcast sur merchants (petite table, 500 lignes) pour éviter un shuffle
+    // de la table de transactions
     val joined = txn
       .join(users.toDF(), Seq("user_id"), "inner")
       .join(prod, Seq("product_id"), "inner")
@@ -120,18 +102,9 @@ class DataTransformation(sparkSession: SparkSession) {
       )
   }
 
-  // ---------------------------------------------------------------------
-  // Partie 3.3 - Analyse par partition Window (fenêtre glissante de 7 jours)
-  // ---------------------------------------------------------------------
-
-  /**
-   * Ajoute, sur un DataFrame de transactions enrichi contenant `transaction_ts` :
-   *  - rolling_7d_amount : somme des montants sur une fenêtre glissante de 7 jours
-   *  - is_active_user_7d : 1 si l'utilisateur a transigé au moins 5 jours distincts
-   *    sur cette même fenêtre glissante de 7 jours, 0 sinon
-   */
+  // fenêtre glissante de 7 jours : montant cumulé + détection utilisateur actif
   def addRollingWindowFeatures(df: DataFrame): DataFrame = {
-    val sevenDaysInSeconds = 6L * 24 * 60 * 60 // jour courant + 6 jours précédents = 7 jours
+    val sevenDaysInSeconds = 6L * 24 * 60 * 60 // jour courant + 6 précédents
 
     val rollingWindow = Window.partitionBy("user_id")
       .orderBy(col("transaction_ts").cast(LongType))

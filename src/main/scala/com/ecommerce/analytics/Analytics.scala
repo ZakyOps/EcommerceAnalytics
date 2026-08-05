@@ -4,19 +4,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
-/** Analytique business : KPI marchands et analyse de cohortes (Partie 4). */
 class Analytics(sparkSession: SparkSession) {
 
-  // ---------------------------------------------------------------------
-  // Partie 4.1 - Rapport détaillé par marchand
-  // ---------------------------------------------------------------------
-
-  /**
-   * Attend un DataFrame de transactions déjà enrichi par
-   * `DataTransformation.enrichTransactionData` (contenant merchant_id,
-   * merchant_name, merchant_category, region, commission_rate, amount,
-   * user_id, age_group).
-   */
+  // enriched = sortie de DataTransformation.enrichTransactionData
   def merchantReport(enriched: DataFrame): DataFrame = {
     val baseAgg = enriched
       .groupBy("merchant_id", "merchant_name", "merchant_category", "region")
@@ -49,16 +39,8 @@ class Analytics(sparkSession: SparkSession) {
       .orderBy(desc("total_revenue"))
   }
 
-  // ---------------------------------------------------------------------
-  // Partie 4.2 - Analyse de cohortes utilisateurs
-  // ---------------------------------------------------------------------
-
-  /**
-   * Regroupe les utilisateurs par mois de première transaction (cohort_month),
-   * puis mesure la rétention : pour chaque cohorte, le nombre de clients
-   * actifs distincts à chaque période (period_number = nombre de mois
-   * écoulés depuis le mois de la cohorte).
-   */
+  // regroupe les users par mois de 1ère transaction (cohort_month), puis compte
+  // les users actifs distincts par période (period_number = mois écoulés depuis la cohorte)
   def cohortAnalysis(enriched: DataFrame): DataFrame = {
     val userFirstTransaction = enriched
       .groupBy("user_id")

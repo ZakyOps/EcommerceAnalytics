@@ -4,10 +4,6 @@ import com.typesafe.config.ConfigFactory
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.storage.StorageLevel
 
-/**
- * Application principale : orchestre tout le pipeline (Partie 6) en s'appuyant
- * sur la configuration externalisée d'application.conf (Partie 7).
- */
 object MainApp {
 
   def main(args: Array[String]): Unit = {
@@ -28,47 +24,41 @@ object MainApp {
       .appName(appName)
       .master(master)
       .config("spark.sql.shuffle.partitions", shufflePartitions)
-      .config("spark.sql.adaptive.enabled", "true") // AQE (Chapitre 6 Optimisation Spark)
+      .config("spark.sql.adaptive.enabled", "true")
       .getOrCreate()
 
-    sparkSession.sparkContext.setLogLevel("ERROR") // réduit les logs bruyants
+    sparkSession.sparkContext.setLogLevel("ERROR")
 
     try {
       println(s"=== $appName : démarrage du pipeline ===")
 
-      // ----- Partie 2 : Ingestion + validation -----
       val ingestion = new DataIngestion(sparkSession)
       val transactions = ingestion.loadTransactions(transactionsPath)
       val users = ingestion.loadUsers(usersPath)
       val products = ingestion.loadProducts(productsPath)
       val merchants = ingestion.loadMerchants(merchantsPath)
 
-      // ----- Partie 3 : Transformations avancées (UDF + jointures + window functions) -----
       val transformation = new DataTransformation(sparkSession)
       val enriched = transformation.enrichTransactionData(transactions, users, products, merchants)
 
-      // Partie 5.1 : `enriched` est réutilisé 3 fois ci-dessous (fenêtre glissante,
-      // rapport marchand, cohortes) => persist en MEMORY_AND_DISK_SER (DataFrame
-      // volumineux issu de jointures + UDF, potentiellement trop gros pour la RAM seule).
+      // enriched est réutilisé 3x plus bas (rolling, rapport marchand, cohortes)
+      // -> persist en MEMORY_AND_DISK_SER
       enriched.persist(StorageLevel.MEMORY_AND_DISK_SER)
-      val enrichedCount = enriched.count() // action qui matérialise le persist
+      val enrichedCount = enriched.count() // matérialise le persist
       println(s"=== Transactions enrichies : $enrichedCount ligne(s) ===")
 
       val enrichedWithRolling = transformation.addRollingWindowFeatures(enriched)
       println("=== Aperçu transactions enrichies (montant cumulé 7j, utilisateur actif) ===")
       enrichedWithRolling.show(10, truncate = false)
 
-      // ----- Partie 4 : Analytique business -----
       val analytics = new Analytics(sparkSession)
 
       val merchantReportDf = analytics.merchantReport(enriched)
       val cohortDf = analytics.cohortAnalysis(enriched)
 
-      // `enriched` n'est plus nécessaire après ces deux calculs : on libère la mémoire.
       enriched.unpersist()
 
-      // Partie 5.1 : chaque rapport est réutilisé pour l'affichage + 2 écritures (CSV/Parquet)
-      merchantReportDf.cache()
+      merchantReportDf.cache() // réutilisé pour show() + 2 écritures
       cohortDf.cache()
 
       println("=== Rapport détaillé par marchand ===")
@@ -77,7 +67,6 @@ object MainApp {
       println("=== Analyse de cohortes utilisateurs ===")
       cohortDf.show(50, truncate = false)
 
-      // ----- Partie 6 : Sauvegarde des résultats (CSV + Parquet) -----
       println(s"=== Sauvegarde des résultats dans '$outputDir' ===")
 
       merchantReportDf.write.mode("overwrite").option("header", "true")
