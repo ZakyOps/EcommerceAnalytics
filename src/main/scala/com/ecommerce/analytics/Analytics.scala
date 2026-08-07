@@ -6,6 +6,7 @@ import org.apache.spark.sql.functions._
 
 class Analytics(sparkSession: SparkSession) {
 
+  // Question 4.1 : rapport détaillé par marchand (KPI + classement + répartition par âge)
   // enriched = sortie de DataTransformation.enrichTransactionData
   def merchantReport(enriched: DataFrame): DataFrame = {
     val baseAgg = enriched
@@ -39,8 +40,9 @@ class Analytics(sparkSession: SparkSession) {
       .orderBy(desc("total_revenue"))
   }
 
-  // regroupe les users par mois de 1ère transaction (cohort_month), puis compte
-  // les users actifs distincts par période (period_number = mois écoulés depuis la cohorte)
+  // Question 4.2 : cohortes utilisateurs. Regroupe par mois de 1ère transaction
+  // (cohort_month), puis compte les users actifs distincts par période
+  // (period_number = mois écoulés depuis la cohorte)
   def cohortAnalysis(enriched: DataFrame): DataFrame = {
     val userFirstTransaction = enriched
       .groupBy("user_id")

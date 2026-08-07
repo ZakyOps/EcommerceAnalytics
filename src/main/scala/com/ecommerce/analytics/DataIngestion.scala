@@ -9,7 +9,7 @@ class DataIngestion(sparkSession: SparkSession) {
 
   import sparkSession.implicits._
 
-  // schéma défini explicitement pour transactions.csv
+  // Question 2.1 : schéma défini explicitement pour transactions.csv
   private val transactionSchema = StructType(Seq(
     StructField("transaction_id", StringType, nullable = false),
     StructField("user_id", StringType, nullable = false),
@@ -22,6 +22,7 @@ class DataIngestion(sparkSession: SparkSession) {
     StructField("category", StringType, nullable = true)
   ))
 
+  // Question 2.2 : validation (une fonction de règles par dataset)
   def validateTransactions(ds: Dataset[Transaction]): Dataset[Transaction] =
     ds.filter(t => t.amount > 0 && t.timestamp != null && t.timestamp.length == 14)
 
@@ -34,6 +35,7 @@ class DataIngestion(sparkSession: SparkSession) {
   def validateMerchants(ds: Dataset[Merchant]): Dataset[Merchant] =
     ds.filter(m => m.commission_rate >= 0 && m.commission_rate <= 1)
 
+  // Question 2.1 : ingestion multi-format (lecture + typage en Dataset[T])
   def loadTransactions(path: String): Dataset[Transaction] =
     loadAndValidate("transactions.csv", sparkSession.emptyDataset[Transaction]) {
       val raw = sparkSession.read
@@ -75,7 +77,7 @@ class DataIngestion(sparkSession: SparkSession) {
       (raw, validateMerchants(raw))
     }
 
-  // factorise le try/catch commun aux 4 lectures + le bilan lignes lues/valides
+  // Question 2.3 : gestion d'erreurs + bilan lignes lues/valides (factorisé pour les 4 lectures)
   private def loadAndValidate[T](
       label: String,
       onError: => Dataset[T]

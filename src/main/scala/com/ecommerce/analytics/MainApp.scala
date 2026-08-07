@@ -8,6 +8,7 @@ object MainApp {
 
   def main(args: Array[String]): Unit = {
 
+    // Question 7.1 : configuration externalisée (application.conf)
     val appConfig = ConfigFactory.load()
 
     val appName = appConfig.getString("app.name")
@@ -29,6 +30,7 @@ object MainApp {
 
     sparkSession.sparkContext.setLogLevel("ERROR")
 
+    // Question 6.1 : orchestration complète du pipeline (ingestion -> transformation -> analytique -> sauvegarde)
     try {
       println(s"=== $appName : démarrage du pipeline ===")
 
@@ -41,7 +43,7 @@ object MainApp {
       val transformation = new DataTransformation(sparkSession)
       val enriched = transformation.enrichTransactionData(transactions, users, products, merchants)
 
-      // enriched est réutilisé 3x plus bas (rolling, rapport marchand, cohortes)
+      // Question 5.1 : enriched est réutilisé 3x plus bas (rolling, rapport marchand, cohortes)
       // -> persist en MEMORY_AND_DISK_SER
       enriched.persist(StorageLevel.MEMORY_AND_DISK_SER)
       val enrichedCount = enriched.count() // matérialise le persist

@@ -1,5 +1,7 @@
 package com.ecommerce.models
 
+// Question 1.1 : case classes du modèle (une par dataset)
+
 case class Transaction(
     transaction_id: String,
     user_id: String,
@@ -41,7 +43,7 @@ case class Merchant(
     establishment_date: String // yyyyMMdd
 )
 
-// struct renvoyé par l'UDF extractTimeFeatures
+// Question 3.1 : struct renvoyé par l'UDF extractTimeFeatures
 case class TimeFeatures(
     hour: Int,
     day_of_week: String,

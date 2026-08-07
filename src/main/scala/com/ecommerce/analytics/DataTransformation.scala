@@ -10,8 +10,8 @@ import java.time.{DayOfWeek, LocalDateTime}
 import java.time.format.{DateTimeFormatter, TextStyle}
 import java.util.Locale
 
-// logique de l'UDF isolée ici (objet top-level, pas de référence à SparkSession)
-// sinon l'eta-expansion capture `this` -> Task not serializable
+// Question 3.1 : UDF extractTimeFeatures. Logique isolée ici (objet top-level,
+// pas de référence à SparkSession) sinon l'eta-expansion capture `this` -> Task not serializable
 object TimeFeaturesUdf {
 
   private val timestampFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
@@ -39,6 +39,7 @@ class DataTransformation(sparkSession: SparkSession) {
 
   val extractTimeFeatures: UserDefinedFunction = TimeFeaturesUdf.extractTimeFeatures
 
+  // Question 3.2 : enrichTransactionData (jointures + UDF + window functions + tranche d'âge)
   def enrichTransactionData(
       transactions: Dataset[Transaction],
       users: Dataset[User],
@@ -69,8 +70,8 @@ class DataTransformation(sparkSession: SparkSession) {
         col("establishment_date")
       )
 
-    // broadcast sur merchants (petite table, 500 lignes) pour éviter un shuffle
-    // de la table de transactions
+    // Question 5.2 : broadcast sur merchants (petite table, 500 lignes) pour
+    // éviter un shuffle de la table de transactions
     val joined = txn
       .join(users.toDF(), Seq("user_id"), "inner")
       .join(prod, Seq("product_id"), "inner")
@@ -102,7 +103,7 @@ class DataTransformation(sparkSession: SparkSession) {
       )
   }
 
-  // fenêtre glissante de 7 jours : montant cumulé + détection utilisateur actif
+  // Question 3.3 : fenêtre glissante de 7 jours (montant cumulé + détection utilisateur actif)
   def addRollingWindowFeatures(df: DataFrame): DataFrame = {
     val sevenDaysInSeconds = 6L * 24 * 60 * 60 // jour courant + 6 précédents
 
